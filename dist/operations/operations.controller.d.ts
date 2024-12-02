@@ -3,6 +3,6 @@ export declare class OperationsController {
     private readonly operationsService;
     constructor(operationsService: OperationsService);
     uploadFile(file: Express.Multer.File): Promise<{
-        file: string;
+        file: unknown;
     }>;
 }

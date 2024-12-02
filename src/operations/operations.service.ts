@@ -9,10 +9,14 @@ export class OperationsService {
 
     return new Promise((resolve, reject) => {
       try {
-        parse(fileContent, {}, (error, output) => {
-          if(error) reject(error)
-          resolve(output)
-        })
+        parse(
+          fileContent,
+          { columns: true },
+          (error, output) => {
+            if(error) reject(error)
+            resolve(output)
+          }
+        )
       } catch(error) {
         reject(error)
       }

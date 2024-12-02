@@ -14,7 +14,7 @@ let OperationsService = class OperationsService {
         const fileContent = file.buffer.toString();
         return new Promise((resolve, reject) => {
             try {
-                (0, csv_parse_1.parse)(fileContent, {}, (error, output) => {
+                (0, csv_parse_1.parse)(fileContent, { columns: true }, (error, output) => {
                     if (error)
                         reject(error);
                     resolve(output);

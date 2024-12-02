@@ -22,7 +22,7 @@ let OperationsController = class OperationsController {
     }
     async uploadFile(file) {
         return {
-            file: file.buffer.toString(),
+            file: await this.operationsService.processFileOperation(file)
         };
     }
 };
