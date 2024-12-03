@@ -4,6 +4,9 @@ import { parse } from 'csv-parse';
 import { OperationData } from './entities/operation.data';
 import { OPERATION_FILE_SCHEMA } from './validators/operationsFile.schema';
 import { ValidationError } from 'yup';
+import { InjectRepository } from '@nestjs/typeorm';
+import { OperationEntity, OperationErrorEntity } from './entities/operation.entity';
+import { Repository } from 'typeorm';
 
 export const SUSPICIOUS_ACTIVITY_THRESHOLD = 5000000
 export interface OperationDTO extends OperationData {
@@ -18,11 +21,17 @@ export interface OperationError {
 export interface OperationDataResults {
   success: OperationDTO[]
   errors: any
-  // errors: { data: OperationData, errors: any[] }[]
 }
 
 @Injectable()
 export class OperationsService {
+  constructor(
+    @InjectRepository(OperationEntity)
+    private readonly operationRepository: Repository<OperationEntity>,
+    @InjectRepository(OperationErrorEntity)
+    private readonly operationErrorRepository: Repository<OperationErrorEntity>,
+  ) {}
+
   async processFileOperation(file: Express.Multer.File): Promise<OperationDataResults> {
     const fileContent: string = file.buffer.toString()
     const parsedData: OperationData[] = await this.extractOperationsFromFile(fileContent)
@@ -31,8 +40,9 @@ export class OperationsService {
     const successfulOperations: Map<string, boolean> = new Map()
 
     for (const data of parsedData) {
+      const operationData: OperationData = { ...data, amount: Number(data.amount ?? null), suspiciousActivity: false }
       try {
-        const operationData = { ...data, amount: Number(data.amount ?? null) }
+        
         await this.validateOperationSchema(data)
 
         const hasDuplicated: boolean =
@@ -42,13 +52,15 @@ export class OperationsService {
           throw ({ data, error:  ['Duplicated operation'] } as OperationError)
         }
 
+        operationData.suspiciousActivity = await this.isAmmountSuspicious(operationData.amount)
+
+        await this.operationRepository.save(operationData)
         successfulOperations.set(`${operationData.from}:${operationData.to}:${operationData.amount}`, true)
-        const suspiciousActivity = operationData.amount > SUSPICIOUS_ACTIVITY_THRESHOLD
-        
-        operationsResults.success.push({ ...operationData, suspiciousActivity })
+        operationsResults.success.push(operationData)
       } catch(err) {
-        const { data, error } = err as unknown as OperationError
-        operationsResults.errors.push({ data, errors: error })
+        const { error } = err as unknown as OperationError
+        operationsResults.errors.push({ data: operationData, errors: error })
+        this.operationErrorRepository.save({ ...operationData, errors: `${error}` })
       }
     }
     return operationsResults
@@ -77,5 +89,9 @@ export class OperationsService {
     } catch(error) {
       throw { data, error } as OperationError
     }
+  }
+
+  private async isAmmountSuspicious(amount: number): Promise<boolean> {
+    return amount > SUSPICIOUS_ACTIVITY_THRESHOLD
   }
 }
